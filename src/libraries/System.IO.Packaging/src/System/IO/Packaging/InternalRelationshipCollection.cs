@@ -96,27 +96,13 @@ namespace System.IO.Packaging
         /// <summary>
         /// Return the relationship whose id is 'id', and null if not found.
         /// </summary>
-        internal PackageRelationship GetRelationship(string id)
-        {
-            int index = GetRelationshipIndex(id);
-            if (index == -1)
-                return null;
-            return _relationships[index];
-        }
+        internal PackageRelationship GetRelationship(string id) => _relationships.GetRelationship(id);
 
         /// <summary>
         /// Delete relationship with ID 'id'
         /// </summary>
         /// <param name="id">ID of the relationship to remove</param>
-        internal void Delete(string id)
-        {
-            int index = GetRelationshipIndex(id);
-            if (index == -1)
-                return;
-
-            _relationships.RemoveAt(index);
-            _dirty = true;
-        }
+        internal void Delete(string id) => _relationships.Delete(id);
 
         /// <summary>
         /// Clear all the relationships in this collection
@@ -199,7 +185,7 @@ namespace System.IO.Packaging
 
             //_sourcePart may be null representing that the relationships are at the package level
             _uri = GetRelationshipPartUri(_sourcePart);
-            _relationships = new List<PackageRelationship>(4);
+            _relationships = new RelationshipCollectionTracker();
 
             // Load if available (not applicable to write-only mode).
             if ((package.FileOpenAccess == FileAccess.Read ||
@@ -499,7 +485,7 @@ namespace System.IO.Packaging
         /// Write one Relationship element for each member of relationships.
         /// This method is used by XmlDigitalSignatureProcessor code as well
         /// </summary>
-        internal static void WriteRelationshipsAsXml(XmlWriter writer, IEnumerable<PackageRelationship> relationships, bool alwaysWriteTargetModeAttribute)
+        private static void WriteRelationshipsAsXml(XmlWriter writer, RelationshipCollectionTracker relationships, bool alwaysWriteTargetModeAttribute)
         {
             foreach (PackageRelationship relationship in relationships)
             {
@@ -619,22 +605,9 @@ namespace System.IO.Packaging
             ThrowIfInvalidXsdId(id);
 
             // Check for uniqueness.
-            if (GetRelationshipIndex(id) >= 0)
+            if (_relationships.Contains(id))
                 throw new XmlException(SR.Format(SR.NotAUniqueRelationshipId, id));
         }
-
-
-        // Retrieve a relationship's index in _relationships given its id.
-        // Return a negative value if not found.
-        private int GetRelationshipIndex(string id)
-        {
-            for (int index = 0; index < _relationships.Count; ++index)
-                if (string.Equals(_relationships[index].Id, id, StringComparison.Ordinal))
-                    return index;
-
-            return -1;
-        }
-
         #endregion
 
         #region Private Properties
@@ -642,10 +615,10 @@ namespace System.IO.Packaging
         #endregion Private Properties
 
         #region Private Members
-        private readonly List<PackageRelationship> _relationships;
-        private bool _dirty;    // true if we have uncommitted changes to _relationships
+        private readonly RelationshipCollectionTracker _relationships;
         private readonly Package _package;     // our package - in case _sourcePart is null
         private readonly PackagePart _sourcePart;      // owning part - null if package is the owner
+        private bool _dirty;    // true if we have uncommitted changes to _relationships
         private PackagePart _relationshipPart;  // where our relationships are persisted
         private readonly Uri _uri;           // the URI of our relationship part
 
@@ -670,5 +643,58 @@ namespace System.IO.Packaging
             = new string[] { PackagingUtilities.RelationshipNamespaceUri };
 
         #endregion
+
+        /// <summary>
+        /// Tracks relationships so that we can have a fast search using a <see cref="Dictionary{TKey, TValue}"/> while also maintaining
+        /// the correct order that the relationships were added with the <see cref="List{T}"/>.
+        /// </summary>
+        private class RelationshipCollectionTracker
+        {
+            private const int InitialCapacity = 4;
+
+            private readonly List<PackageRelationship> _list;
+            private readonly Dictionary<string, PackageRelationship> _set;
+
+            public RelationshipCollectionTracker()
+            {
+                _list = new List<PackageRelationship>(InitialCapacity);
+                _set = new Dictionary<string, PackageRelationship>(InitialCapacity, StringComparer.Ordinal);
+            }
+
+            public PackageRelationship GetRelationship(string id) => _set.TryGetValue(id, out PackageRelationship result) ? result : null;
+
+            public void Add(PackageRelationship relationship)
+            {
+                _list.Add(relationship);
+                _set.Add(relationship.Id, relationship);
+            }
+
+            public bool Contains(string id) => _set.ContainsKey(id);
+
+            public void Clear()
+            {
+                _list.Clear();
+                _set.Clear();
+            }
+
+            public void Delete(string id)
+            {
+                if (_set.Remove(id))
+                {
+                    foreach (PackageRelationship package in _list)
+                    {
+                        if (string.Equals(package.Id, id, StringComparison.Ordinal))
+                        {
+                            _list.Remove(package);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            public int Count => _list.Count;
+
+            public List<PackageRelationship>.Enumerator GetEnumerator() => _list.GetEnumerator();
+        }
     }
 }
