@@ -39,6 +39,7 @@
     <Compile Include="System\IO\Packaging\PackageRelationshipCollection.cs" />
     <Compile Include="System\IO\Packaging\PackageRelationshipSelector.cs" />
     <Compile Include="System\IO\Packaging\PackageRelationshipSelectorType.cs" />
+    <Compile Include="System\IO\Packaging\PackageSettings.cs" />
     <Compile Include="System\IO\Packaging\PackageXmlEnum.cs" />
     <Compile Include="System\IO\Packaging\PackageXmlStringTable.cs" />
     <Compile Include="System\IO\Packaging\PackagingUtilities.cs" />
@@ -56,5 +57,9 @@
   <ItemGroup Condition="$(TargetFramework.StartsWith('net4'))">
     <Reference Include="mscorlib" />
     <Reference Include="WindowsBase" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="System\IO\Packaging\DefaultUriFactory.cs" />
+    <Compile Include="System\IO\Packaging\IUriFactory.cs" />
   </ItemGroup>
 </Project>

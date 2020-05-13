@@ -253,33 +253,28 @@ namespace System.IO.Packaging
         /// Internal constructor that is called by the OpenOnFile static method.
         /// </summary>
         /// <param name="path">File path to the container.</param>
-        /// <param name="packageFileMode">Container is opened in the specified mode if possible</param>
-        /// <param name="packageFileAccess">Container is opened with the specified access if possible</param>
-        /// <param name="share">Container is opened with the specified share if possible</param>
-
-        internal ZipPackage(string path, FileMode packageFileMode, FileAccess packageFileAccess, FileShare share)
-            : base(packageFileAccess)
+        /// <param name="settings">Container is opened in the specified mode if possible</param>
+        internal ZipPackage(string path, PackageSettings settings)
+            : base(settings)
         {
             ZipArchive zipArchive = null;
             ContentTypeHelper contentTypeHelper = null;
-            _packageFileMode = packageFileMode;
-            _packageFileAccess = packageFileAccess;
 
             try
             {
-                _containerStream = new FileStream(path, _packageFileMode, _packageFileAccess, share);
+                _containerStream = new FileStream(path, settings.PackageMode, settings.PackageAccess, settings.PackageShare);
                 _shouldCloseContainerStream = true;
                 ZipArchiveMode zipArchiveMode = ZipArchiveMode.Update;
-                if (packageFileAccess == FileAccess.Read)
+                if (settings.PackageAccess == FileAccess.Read)
                     zipArchiveMode = ZipArchiveMode.Read;
-                else if (packageFileAccess == FileAccess.Write)
+                else if (settings.PackageAccess == FileAccess.Write)
                     zipArchiveMode = ZipArchiveMode.Create;
-                else if (packageFileAccess == FileAccess.ReadWrite)
+                else if (settings.PackageAccess == FileAccess.ReadWrite)
                     zipArchiveMode = ZipArchiveMode.Update;
 
                 zipArchive = new ZipArchive(_containerStream, zipArchiveMode, true, Text.Encoding.UTF8);
-                _zipStreamManager = new ZipStreamManager(zipArchive, _packageFileMode, _packageFileAccess);
-                contentTypeHelper = new ContentTypeHelper(zipArchive, _packageFileMode, _packageFileAccess, _zipStreamManager);
+                _zipStreamManager = new ZipStreamManager(zipArchive, settings.PackageMode, settings.PackageAccess);
+                contentTypeHelper = new ContentTypeHelper(zipArchive, settings.PackageMode, settings.PackageAccess, _zipStreamManager);
             }
             catch
             {
@@ -299,21 +294,18 @@ namespace System.IO.Packaging
         /// Internal constructor that is called by the Open(Stream) static methods.
         /// </summary>
         /// <param name="s"></param>
-        /// <param name="packageFileMode"></param>
-        /// <param name="packageFileAccess"></param>
-        internal ZipPackage(Stream s, FileMode packageFileMode, FileAccess packageFileAccess)
-            : base(packageFileAccess)
+        /// <param name="settings"></param>
+        internal ZipPackage(Stream s, PackageSettings settings)
+            : base(settings)
         {
             ZipArchive zipArchive = null;
             ContentTypeHelper contentTypeHelper = null;
-            _packageFileMode = packageFileMode;
-            _packageFileAccess = packageFileAccess;
 
             try
             {
                 if (s.CanSeek)
                 {
-                    switch (packageFileMode)
+                    switch (settings.PackageMode)
                     {
                         case FileMode.Open:
                             if (s.Length == 0)
@@ -339,17 +331,17 @@ namespace System.IO.Packaging
                 }
 
                 ZipArchiveMode zipArchiveMode = ZipArchiveMode.Update;
-                if (packageFileAccess == FileAccess.Read)
+                if (settings.PackageAccess == FileAccess.Read)
                     zipArchiveMode = ZipArchiveMode.Read;
-                else if (packageFileAccess == FileAccess.Write)
+                else if (settings.PackageAccess == FileAccess.Write)
                     zipArchiveMode = ZipArchiveMode.Create;
-                else if (packageFileAccess == FileAccess.ReadWrite)
+                else if (settings.PackageAccess == FileAccess.ReadWrite)
                     zipArchiveMode = ZipArchiveMode.Update;
 
                 zipArchive = new ZipArchive(s, zipArchiveMode, true, Text.Encoding.UTF8);
 
-                _zipStreamManager = new ZipStreamManager(zipArchive, packageFileMode, packageFileAccess);
-                contentTypeHelper = new ContentTypeHelper(zipArchive, packageFileMode, packageFileAccess, _zipStreamManager);
+                _zipStreamManager = new ZipStreamManager(zipArchive, settings.PackageMode, settings.PackageAccess);
+                contentTypeHelper = new ContentTypeHelper(zipArchive, settings.PackageMode, settings.PackageAccess, _zipStreamManager);
             }
             catch (InvalidDataException)
             {
@@ -432,14 +424,6 @@ namespace System.IO.Packaging
 
         #endregion Internal Methods
 
-        internal FileMode PackageFileMode
-        {
-            get
-            {
-                return _packageFileMode;
-            }
-        }
-
         #region Private Methods
 
         //returns a boolean indicating if the underlying zip item is a valid metro part or piece
@@ -494,8 +478,6 @@ namespace System.IO.Packaging
         private readonly bool _shouldCloseContainerStream;
         private readonly ContentTypeHelper _contentTypeHelper;    // manages the content types for all the parts in the container
         private readonly ZipStreamManager _zipStreamManager;      // manages streams for all parts, avoiding opening streams multiple times
-        private readonly FileAccess _packageFileAccess;
-        private readonly FileMode _packageFileMode;
 
         private const string ForwardSlashString = "/"; //Required for creating a part name from a zip item name
 

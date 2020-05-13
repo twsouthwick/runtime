@@ -27,10 +27,15 @@ namespace System.IO.Packaging
         /// <param name="openFileAccess"></param>
         /// <exception cref="ArgumentOutOfRangeException">If FileAccess enumeration does not have one of the valid values</exception>
         protected Package(FileAccess openFileAccess)
+            : this(new PackageSettings { PackageAccess = openFileAccess })
         {
-            ThrowIfFileAccessInvalid(openFileAccess);
+        }
 
-            _openFileAccess = openFileAccess;
+        protected Package(PackageSettings settings)
+        {
+            ThrowIfFileAccessInvalid(settings.PackageAccess);
+
+            Settings = settings;
 
             //PackUriHelper.ValidatedPartUri implements the IComparable interface.
             _partList = new SortedList<PackUriHelper.ValidatedPartUri, PackagePart>(); // initial default is zero
@@ -53,7 +58,7 @@ namespace System.IO.Packaging
             get
             {
                 ThrowIfObjectDisposed();
-                return _openFileAccess;
+                return Settings.PackageAccess;
             }
         }
 
@@ -93,7 +98,14 @@ namespace System.IO.Packaging
         /// <exception cref="ArgumentNullException">If path parameter is null</exception>
         public static Package Open(string path)
         {
-            return Open(path, s_defaultFileMode, s_defaultFileAccess, s_defaultFileShare);
+            var settings = new PackageSettings
+            {
+                PackageMode = s_defaultFileMode,
+                PackageAccess = s_defaultFileAccess,
+                PackageShare = s_defaultFileShare
+            };
+
+            return Open(path, settings);
         }
 
         /// <summary>
@@ -109,7 +121,14 @@ namespace System.IO.Packaging
         /// <exception cref="ArgumentOutOfRangeException">If FileMode enumeration [packageMode] does not have one of the valid values</exception>
         public static Package Open(string path, FileMode packageMode)
         {
-            return Open(path, packageMode, s_defaultFileAccess, s_defaultFileShare);
+            var settings = new PackageSettings
+            {
+                PackageMode = packageMode,
+                PackageAccess = s_defaultFileAccess,
+                PackageShare = s_defaultFileShare
+            };
+
+            return Open(path, settings);
         }
 
         /// <summary>
@@ -126,7 +145,14 @@ namespace System.IO.Packaging
         /// <exception cref="ArgumentOutOfRangeException">If FileAccess enumeration [packageAccess] does not have one of the valid values</exception>
         public static Package Open(string path, FileMode packageMode, FileAccess packageAccess)
         {
-            return Open(path, packageMode, packageAccess, s_defaultFileShare);
+            var settings = new PackageSettings
+            {
+                PackageMode = packageMode,
+                PackageAccess = packageAccess,
+                PackageShare = s_defaultFileShare
+            };
+
+            return Open(path, settings);
         }
 
         #endregion OpenOnFileMethods
@@ -146,7 +172,13 @@ namespace System.IO.Packaging
         /// <exception cref="IOException">If package to be created should have readwrite/write access and underlying stream is read only</exception>
         public static Package Open(Stream stream)
         {
-            return Open(stream, s_defaultStreamMode, s_defaultStreamAccess);
+            var settings = new PackageSettings
+            {
+                PackageMode = s_defaultStreamMode,
+                PackageAccess = s_defaultStreamAccess
+            };
+
+            return Open(stream, settings);
         }
 
         /// <summary>
@@ -165,7 +197,13 @@ namespace System.IO.Packaging
         {
             //If the user is providing a FileMode, in all the modes, except FileMode.Open,
             //its most likely that the user intends to write to the stream.
-            return Open(stream, packageMode, s_defaultFileAccess);
+            var settings = new PackageSettings
+            {
+                PackageMode = packageMode,
+                PackageAccess = s_defaultFileAccess
+            };
+
+            return Open(stream, settings);
         }
 
         #endregion OpenOnStreamMethods
@@ -769,6 +807,7 @@ namespace System.IO.Packaging
 
         #region Internal Properties
 
+        internal PackageSettings Settings { get; }
 
         #endregion Internal Properties
 
@@ -777,14 +816,14 @@ namespace System.IO.Packaging
         //If the container is readonly then we cannot add/delete to it
         internal void ThrowIfReadOnly()
         {
-            if (_openFileAccess == FileAccess.Read)
+            if (Settings.PackageAccess == FileAccess.Read)
                 throw new IOException(SR.CannotModifyReadOnlyContainer);
         }
 
         // If the container is writeonly, parts cannot be retrieved from it
         internal void ThrowIfWriteOnly()
         {
-            if (_openFileAccess == FileAccess.Write)
+            if (Settings.PackageAccess == FileAccess.Write)
                 throw new IOException(SR.CannotRetrievePartsOfWriteOnlyContainer);
         }
 
@@ -828,20 +867,32 @@ namespace System.IO.Packaging
             FileAccess packageAccess,
             FileShare packageShare)
         {
+            var settings = new PackageSettings
+            {
+                PackageMode = packageMode,
+                PackageAccess = packageAccess,
+                PackageShare = packageShare
+            };
+
+            return Open(path, settings);
+        }
+
+        public static Package Open(string path, PackageSettings settings)
+        {
             Package package = null;
             if (path == null)
                 throw new ArgumentNullException(nameof(path));
 
-            ThrowIfFileModeInvalid(packageMode);
-            ThrowIfFileAccessInvalid(packageAccess);
+            ThrowIfFileModeInvalid(settings.PackageMode);
+            ThrowIfFileAccessInvalid(settings.PackageAccess);
 
-            if (packageMode == FileMode.OpenOrCreate && packageAccess != FileAccess.ReadWrite)
+            if (settings.PackageMode == FileMode.OpenOrCreate && settings.PackageAccess != FileAccess.ReadWrite)
                 throw new ArgumentException(SR.UnsupportedCombinationOfModeAccess);
-            if (packageMode == FileMode.Open && packageAccess == FileAccess.Write)
+            if (settings.PackageMode == FileMode.Open && settings.PackageAccess == FileAccess.Write)
                 throw new ArgumentException(SR.UnsupportedCombinationOfModeAccess);
-            if (packageMode == FileMode.Truncate && packageAccess == FileAccess.Read)
+            if (settings.PackageMode == FileMode.Truncate && settings.PackageAccess == FileAccess.Read)
                 throw new ArgumentException(SR.UnsupportedCombinationOfModeAccess);
-            if (packageMode == FileMode.Truncate)
+            if (settings.PackageMode == FileMode.Truncate)
                 throw new NotSupportedException(SR.UnsupportedCombinationOfModeAccess);
 
             //Note: FileShare enum is not being verified at this stage, as we do not interpret the flag in this
@@ -856,8 +907,7 @@ namespace System.IO.Packaging
 
             try
             {
-                package = new ZipPackage(packageFileInfo.FullName, packageMode, packageAccess, packageShare);
-                package._openFileMode = packageMode;
+                package = new ZipPackage(packageFileInfo.FullName, settings);
 
                 //We need to get all the parts if any exists from the underlying file
                 //so that we have the names in the Normalized form in our in-memory
@@ -893,6 +943,17 @@ namespace System.IO.Packaging
         /// <exception cref="IOException">If package to be created should have readwrite/write access and underlying stream is read only</exception>
         public static Package Open(Stream stream, FileMode packageMode, FileAccess packageAccess)
         {
+            var settings = new PackageSettings
+            {
+                PackageMode = packageMode,
+                PackageAccess = packageAccess
+            };
+
+            return Open(stream, settings);
+        }
+
+        public static Package Open(Stream stream, PackageSettings settings)
+        {
             Package package = null;
             if (stream == null)
                 throw new ArgumentNullException(nameof(stream));
@@ -902,7 +963,7 @@ namespace System.IO.Packaging
                 // Today the Open(Stream) method is purely used for streams of Zip file format as
                 // that is the default underlying file format mapper implemented.
 
-                package = new ZipPackage(stream, packageMode, packageAccess);
+                package = new ZipPackage(stream, settings);
 
                 //We need to get all the parts if any exists from the underlying file
                 //so that we have the names in the Normalized form in our in-memory
@@ -1019,7 +1080,7 @@ namespace System.IO.Packaging
         private void FlushRelationships()
         {
             // flush relationships
-            if (_relationships != null && _openFileAccess != FileAccess.Read)
+            if (_relationships != null && Settings.PackageAccess != FileAccess.Read)
             {
                 _relationships.Flush();
             }
@@ -1197,8 +1258,6 @@ namespace System.IO.Packaging
         private const FileMode s_defaultStreamMode = FileMode.Open;
         private const FileAccess s_defaultStreamAccess = FileAccess.Read;
 
-        private readonly FileAccess _openFileAccess;
-        private FileMode _openFileMode;
         private bool _disposed;
         private SortedList<PackUriHelper.ValidatedPartUri, PackagePart> _partList;
         private PackagePartCollection _partCollection;

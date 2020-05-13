@@ -19,6 +19,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Xml;                           // for XmlReader/Writer
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace System.IO.Packaging
 {
@@ -358,7 +359,7 @@ namespace System.IO.Packaging
             if (string.IsNullOrEmpty(targetAttributeValue))
                 throw new XmlException(SR.Format(SR.RequiredRelationshipAttributeMissing, TargetAttributeName), null, reader.LineNumber, reader.LinePosition);
 
-            Uri targetUri = new Uri(targetAttributeValue, DotNetRelativeOrAbsolute);
+            Uri targetUri = this._package.Settings.UriFactory.CreateUri(targetAttributeValue, DotNetRelativeOrAbsolute);
 
             // Attribute : Type
             string typeAttributeValue = reader.GetAttribute(TypeAttributeName);
@@ -499,7 +500,7 @@ namespace System.IO.Packaging
         /// Write one Relationship element for each member of relationships.
         /// This method is used by XmlDigitalSignatureProcessor code as well
         /// </summary>
-        internal static void WriteRelationshipsAsXml(XmlWriter writer, IEnumerable<PackageRelationship> relationships, bool alwaysWriteTargetModeAttribute)
+        internal void WriteRelationshipsAsXml(XmlWriter writer, IEnumerable<PackageRelationship> relationships, bool alwaysWriteTargetModeAttribute)
         {
             foreach (PackageRelationship relationship in relationships)
             {
@@ -516,7 +517,7 @@ namespace System.IO.Packaging
                 // the string can be converted to a valid Uri.
                 // Also, we are just using it here to persist the information and we are not
                 // resolving or fetching a resource based on this Uri.
-                writer.WriteAttributeString(TargetAttributeName, relationship.TargetUri.OriginalString);
+                writer.WriteAttributeString(TargetAttributeName, _package.Settings.UriFactory.GetOriginalString(relationship.TargetUri));
 
                 // TargetMode is optional attribute in the markup and its default value is TargetMode="Internal"
                 if (alwaysWriteTargetModeAttribute || relationship.TargetMode == TargetMode.External)

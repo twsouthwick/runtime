@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;netstandard1.3;net46;$(NetFrameworkCurrent)</TargetFrameworks>
     <ExcludeCurrentFullFrameworkFromPackage>true</ExcludeCurrentFullFrameworkFromPackage>
@@ -7,6 +7,7 @@
   <PropertyGroup>
     <DefineConstants Condition="'$(TargetFramework)' == 'netstandard1.3'">$(DefineConstants);netcoreapp</DefineConstants>
     <IsPartialFacadeAssembly Condition="$(TargetFramework.StartsWith('net4'))">true</IsPartialFacadeAssembly>
+    <IsPartialFacadeAssembly Condition="!$(TargetFramework.StartsWith('net4'))">false</IsPartialFacadeAssembly>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="System.IO.Packaging.cs" />
@@ -14,6 +15,9 @@
   <ItemGroup Condition="'$(TargetFramework)' != 'netstandard1.3'">
     <Compile Include="System.IO.Packaging.Serialization.cs" />
     <Compile Include="System.IO.Packaging.PackUriScheme.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="!$(IsPartialFacadeAssembly)">
+    <Compile Include="System.IO.Packaging.Settings.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == '$(NetFrameworkCurrent)' or '$(TargetFramework)' == 'net46'">
     <Reference Include="mscorlib" />
